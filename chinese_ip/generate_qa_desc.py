@@ -651,7 +651,7 @@ def prepare_model():
 
 
 def random_generate():
-    f=open("qa.jsonl",'r')
+    f=open("data/qa_human.jsonl",'r')
     qs=f.readlines()
     question_list=[]
     import json
