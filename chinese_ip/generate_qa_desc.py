@@ -593,7 +593,7 @@ def set_args():
     args.deepspeed_config="script_dir/ds_config.json"
     args.num_layers=32
     args.hidden_size=2560
-    args.load="../ckp"
+    args.load="txl-2.9B"
     args.num_attention_heads=32
     args.max_position_embeddings=1024
     args.tokenizer_type="ChineseSPTokenizer"
