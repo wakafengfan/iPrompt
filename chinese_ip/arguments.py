@@ -67,7 +67,7 @@ def add_model_config_args(parser):
     group.add_argument('--cpu_torch_adam', action='store_true',
                        help='Use Torch Adam as optimizer on CPU.')
     group.add_argument('--port',default='6000')
-    group.add_argument('--gpu',default='0')
+    group.add_argument('--gpu',default='1')
     return parser
 
 

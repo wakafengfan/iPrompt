@@ -61,7 +61,7 @@ def setup_model(args):
         if args.deepspeed:
             iteration, release, success = get_checkpoint_iteration(args)
             print(iteration)
-            path = os.path.join(args.load, str(iteration), "mp_rank_00_model_states.pt")
+            path = os.path.join(args.load, "mp_rank_00_model_states.pt")
             checkpoint = torch.load(path)
             model.load_state_dict(checkpoint["module"])
         else:

@@ -61,7 +61,7 @@ def setup_model(args):
         if args.deepspeed:
             iteration, release, success = get_checkpoint_iteration(args)
             print(iteration)
-            path = os.path.join(args.load, str(iteration), "mp_rank_00_model_states.pt")
+            path = os.path.join(args.load, "mp_rank_00_model_states.pt")
             checkpoint = torch.load(path)
             model.load_state_dict(checkpoint["module"])
         else:
@@ -89,7 +89,7 @@ def get_batch(context_tokens, device, args):
 
     return tokens, attention_mask, position_ids
 
-def generate_score(model, tokenizer, args, device, input_str, eval_str):
+def generate_score(model, tokenizer, args, device, input_str, eval_str): # input_str是“xxx回答了这个问题”，eval_str是描述
     #penalty on same word
 
     context_count = 0
@@ -225,14 +225,14 @@ def generate_sentence(model,tokenizer,args,device,current_tokens,mems,endnote=["
             index=len(tokens[0])
             logits,*rts=model(tokens[:, index - 1: index], tokens.new_ones((1, 1)) * (index - 1),
                         tokens.new_ones(1, 1, 1, args.mem_length + 1, device=tokens.device,
-                                                            dtype=torch.float), *mems)
+                                                            dtype=torch.float), *mems)  # rts是32层layer的hidden，1层embed的hidden
                                                             
         output_tokens_list = tokens.view(-1).contiguous()
         original_context=tokenizer.DecodeIds(output_tokens_list.tolist())
         context_length=len(tokens[0])
         logits=logits[0,-1]
         #mct_structure=-np.ones(len(logits))
-        mct_tree.append([logits,rts,tokens,-np.ones(len(logits)),torch.ones(len(logits)).cuda(),0])
+        mct_tree.append([logits,rts,tokens,-np.ones(len(logits)),torch.ones(len(logits)).cuda(),0]) # 0:logits 1:rts 2:tokens 3:[-1..-1] 4:[1..1], 5:0
         #print(logits.shape)
         final_result=[]
         nextid=0
@@ -245,21 +245,21 @@ def generate_sentence(model,tokenizer,args,device,current_tokens,mems,endnote=["
                 tc=torch.log(mct_tree[currentid][4])
                 tc=tc+F.relu(tc-10)*1000
                 logits=mct_tree[currentid][0].view(-1)-tc*0.5
-                logits=logits[:50001]
-                log_probs = F.softmax(logits/args.temperature, dim=-1)
+                logits=logits[:50001]  # 50001之后是dummpy token
+                log_probs = F.softmax(logits/args.temperature, dim=-1) # 最后一个token的prob
               
-                pr=torch.multinomial(log_probs,num_samples=1)[0]
+                pr=torch.multinomial(log_probs,num_samples=1)[0] # 选num_samples个token_id
                 #pr=torch.argmax(logits)
                 prev=pr.item()
                 #print(logits.shape,currentid,prev)
-                mct_tree[currentid][4][prev]+=1
+                mct_tree[currentid][4][prev]+=1 # [1..1]的第prev个+1
                 lastid=currentid
                 currentid=int(mct_tree[currentid][3][prev])
             #start from lastid & currentid
             
             cqs=mct_tree[lastid][2]
             #print(pr)
-            tokens = torch.cat((cqs, pr.unsqueeze(0).view(1, 1)), dim=1)
+            tokens = torch.cat((cqs, pr.unsqueeze(0).view(1, 1)), dim=1)  # 拼接生成的token
             output_tokens_list = tokens.view(-1).contiguous()
             #if max_length==min_length:
              #   print(min_length,output_tokens_list,context_length)
@@ -270,7 +270,7 @@ def generate_sentence(model,tokenizer,args,device,current_tokens,mems,endnote=["
             logit=mct_tree[lastid][0]
             log_probs = F.softmax(logit, dim=-1)
             log_pbs=torch.log(log_probs)
-            score=log_pbs[prev].item()
+            score=log_pbs[prev].item() # 生成token的log_softmax
             nextid=0
             ip=checksentence(sentence,original_context,min_length,max_length,endnote)
             for j in final_result:
@@ -281,7 +281,7 @@ def generate_sentence(model,tokenizer,args,device,current_tokens,mems,endnote=["
                     
             score=mct_tree[lastid][5]+score
             if (ip==1):
-                mct_tree[lastid][4][prev]=10000
+                mct_tree[lastid][4][prev]=10000 # [1..1]上一步生成token的位置加大
                 continue
             if (ip==0):
                 mct_tree[lastid][4][prev]=10000
@@ -418,7 +418,7 @@ def generate_string(model, tokenizer, args, device,title,desc):
             iscore=score1-1.5*(np.abs(ss)+ss)
             beam_sentences[w][1]=iscore
             #print(beam_sentences[w][0],beam_sentences[w][1])
-            overall_score.append(iscore)
+            overall_score.append(iscore.item())
             past_beam_id.append(w)
             
         gy=np.argsort(overall_score)
@@ -514,7 +514,7 @@ def generate_string(model, tokenizer, args, device,title,desc):
                     jj[1]=iscore+ini_score
                     #print(jj[0],jj[1])
                     beam_new_sentences.append(jj)
-                    overall_score.append(jj[1])
+                    overall_score.append(jj[1].item())
                     past_beam_id.append(w)
             del beam_sentences
             torch.cuda.empty_cache()
